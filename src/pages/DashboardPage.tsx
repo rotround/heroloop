@@ -12,7 +12,7 @@ interface DashboardPageProps {
 }
 
 type DashboardView = "overview" | "create" | "characters" | "ctps" | "requests";
-const initialForm = { name: "", slug: "", category: "combat", image_url: "", portrait_id: "", uniform: "", role: "DPS PvE", meta: "normal", rotation: "", ctp_id: "", youtube: "" };
+const initialForm = { name: "", slug: "", category: "combat", image_url: "", portrait_id: "", uniform: "", role: "DPS PvE", meta: "normal", rotation: "", ctp_id: "", secondary_ctp_id: "", youtube: "" };
 
 function slugify(value: string) {
   return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -41,12 +41,13 @@ export function DashboardPage({ user, profile }: DashboardPageProps) {
   const [ctps, setCtps] = useState<Ctp[]>([]);
   const [characters, setCharacters] = useState<AdminCharacter[]>([]);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
-  const [picker, setPicker] = useState<"portrait" | "ctp" | null>(null);
+  const [picker, setPicker] = useState<"portrait" | "ctp" | "ctp2" | null>(null);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const allowed = ["owner", "admin", "contributor"].includes(profile?.role ?? "");
   const isOwner = profile?.role === "owner";
   const selectedCtp = useMemo(() => ctps.find((ctp) => ctp.id === form.ctp_id), [ctps, form.ctp_id]);
+  const selectedSecondaryCtp = useMemo(() => ctps.find((ctp) => ctp.id === form.secondary_ctp_id), [ctps, form.secondary_ctp_id]);
 
   const loadData = useCallback(async () => {
     const queries = [
@@ -60,7 +61,7 @@ export function DashboardPage({ user, profile }: DashboardPageProps) {
       const [{ data: characterData }, { data: rotationData }, { data: recommendationData }, { data: requestData }] = await Promise.all([
         supabase.from("characters").select("id,name,slug,category,image_url,recommended_uniform,pve_role,meta_status,is_published").order("name"),
         supabase.from("rotations").select("id,character_id,rotation_text,youtube_url").eq("is_primary", true),
-        supabase.from("ctp_recommendations").select("id,character_id,ctp_id,best_ctp"),
+        supabase.from("ctp_recommendations").select("id,character_id,ctp_id,best_ctp,secondary_ctp_id"),
         supabase.from("access_requests").select("id,user_id,message,status,created_at,profiles!access_requests_user_id_fkey(display_name,avatar_url)").eq("status", "pending").order("created_at"),
       ]);
       setCharacters((characterData ?? []).map((character) => ({
@@ -100,6 +101,7 @@ export function DashboardPage({ user, profile }: DashboardPageProps) {
       meta: character.meta_status,
       rotation: rotation?.rotation_text ?? "",
       ctp_id: recommendation?.ctp_id ?? "",
+      secondary_ctp_id: recommendation?.secondary_ctp_id ?? "",
       youtube: rotation?.youtube_url ?? "",
     });
     setEditingId(character.id);
@@ -127,8 +129,8 @@ export function DashboardPage({ user, profile }: DashboardPageProps) {
           ? supabase.from("rotations").update({ rotation_text: form.rotation, youtube_url: form.youtube || null, youtube_video_id: youtubeId(form.youtube), is_published: published }).eq("id", rotation.id)
           : supabase.from("rotations").insert({ character_id: editingId, rotation_text: form.rotation, youtube_url: form.youtube || null, youtube_video_id: youtubeId(form.youtube), is_primary: true, is_published: published }),
         recommendation
-          ? supabase.from("ctp_recommendations").update({ ctp_id: selectedCtp?.id, best_ctp: selectedCtp?.name }).eq("id", recommendation.id)
-          : supabase.from("ctp_recommendations").insert({ character_id: editingId, ctp_id: selectedCtp?.id, best_ctp: selectedCtp?.name }),
+          ? supabase.from("ctp_recommendations").update({ ctp_id: selectedCtp?.id, best_ctp: selectedCtp?.name, secondary_ctp_id: selectedSecondaryCtp?.id ?? null }).eq("id", recommendation.id)
+          : supabase.from("ctp_recommendations").insert({ character_id: editingId, ctp_id: selectedCtp?.id, best_ctp: selectedCtp?.name, secondary_ctp_id: selectedSecondaryCtp?.id ?? null }),
       ]);
       const error = results.find((result) => result.error)?.error;
       setStatus(error?.message ?? "Personagem atualizado com sucesso.");
@@ -141,7 +143,7 @@ export function DashboardPage({ user, profile }: DashboardPageProps) {
       }
       const results = await Promise.all([
         supabase.from("rotations").insert({ character_id: character.id, rotation_text: form.rotation, youtube_url: form.youtube || null, youtube_video_id: youtubeId(form.youtube), is_primary: true, is_published: published }),
-        supabase.from("ctp_recommendations").insert({ character_id: character.id, ctp_id: selectedCtp?.id, best_ctp: selectedCtp?.name }),
+        supabase.from("ctp_recommendations").insert({ character_id: character.id, ctp_id: selectedCtp?.id, best_ctp: selectedCtp?.name, secondary_ctp_id: selectedSecondaryCtp?.id ?? null }),
       ]);
       const childError = results.find((result) => result.error)?.error;
       setStatus(childError?.message ?? (published ? "Personagem publicado com sucesso." : "Personagem enviado como rascunho para aprovação."));
@@ -293,13 +295,14 @@ export function DashboardPage({ user, profile }: DashboardPageProps) {
               <label className="span-2">Retrato<button className="asset-select-button" type="button" onClick={() => setPicker("portrait")}>{form.image_url ? <img src={form.image_url} alt="" /> : <ImagePlus size={22} />}<span><strong>{portraits.find((portrait) => portrait.id === form.portrait_id)?.file_name ?? "Adicionar retrato"}</strong><small>Abra a biblioteca visual para escolher ou colar uma imagem</small></span></button></label>
               <label>Rotação principal<input value={form.rotation} onChange={(e) => update("rotation", e.target.value)} required placeholder="6dc5c1c2c3c4" /></label>
               <label>Melhor CTP<button className="asset-select-button compact-asset" type="button" onClick={() => setPicker("ctp")}>{selectedCtp?.image_url ? <img src={selectedCtp.image_url} alt="" /> : <ImagePlus size={22} />}<span><strong>{selectedCtp?.name ?? "Escolher CTP criado"}</strong><small>Selecione um item da biblioteca de CTPs</small></span></button></label>
-              <label className="span-2">Link do vídeo no YouTube<input type="url" value={form.youtube} onChange={(e) => update("youtube", e.target.value)} placeholder="https://youtube.com/watch?v=..." /></label>
+              <label>CTP 2 (opcional)<button className="asset-select-button compact-asset" type="button" onClick={() => setPicker("ctp2")}>{selectedSecondaryCtp?.image_url ? <img src={selectedSecondaryCtp.image_url} alt="" /> : <ImagePlus size={22} />}<span><strong>{selectedSecondaryCtp?.name ?? "Sem segundo CTP"}</strong><small>Alternativa recomendada</small></span></button>{form.secondary_ctp_id && <button className="clear-selection" type="button" onClick={() => update("secondary_ctp_id", "")}>Remover CTP 2</button>}</label>
+              <label>Link do vídeo no YouTube<input type="url" value={form.youtube} onChange={(e) => update("youtube", e.target.value)} placeholder="https://youtube.com/watch?v=..." /></label>
               <button className="primary-button span-2" type="submit" disabled={busy}><ShieldCheck size={18} /> {editingId ? "Salvar alterações" : isOwner ? "Cadastrar e publicar" : "Enviar para aprovação"}</button>
             </form>
           </section>
         )}
 
-        {view === "characters" && <section className="admin-section"><div className="admin-section-heading"><div><Users /><div><h2>Personagens cadastrados</h2><p>Edite informações, retrato, rotação e CTP ou exclua o cadastro.</p></div></div></div><div className="management-grid">{characters.map((character) => <article className="management-card" key={character.id}>{character.image_url ? <img src={character.image_url} alt="" /> : <span>{character.name.slice(0, 2)}</span>}<div><strong>{character.name}</strong><small>{character.ctp_recommendations?.[0]?.best_ctp ?? "Sem CTP"} · {character.rotations?.[0]?.rotation_text ?? "Sem rotação"}</small></div><div className="management-actions"><button type="button" onClick={() => editCharacter(character)}><Pencil size={14} /> Editar</button><button className="danger" type="button" onClick={() => void deleteCharacter(character)}><Trash2 size={14} /> Excluir</button></div></article>)}</div></section>}
+        {view === "characters" && <section className="admin-section"><div className="admin-section-heading"><div><Users /><div><h2>Personagens cadastrados</h2><p>Edite informações, retrato, rotação e CTP ou exclua o cadastro.</p></div></div></div><div className="management-grid">{characters.map((character) => { const recommendation = character.ctp_recommendations?.[0]; const ctp2 = ctps.find((ctp) => ctp.id === recommendation?.secondary_ctp_id); return <article className="management-card" key={character.id}>{character.image_url ? <img src={character.image_url} alt="" /> : <span>{character.name.slice(0, 2)}</span>}<div><strong>{character.name}</strong><small>{recommendation?.best_ctp ?? "Sem CTP"}{ctp2 ? ` / ${ctp2.name}` : ""} · {character.rotations?.[0]?.rotation_text ?? "Sem rotação"}</small></div><div className="management-actions"><button type="button" onClick={() => editCharacter(character)}><Pencil size={14} /> Editar</button><button className="danger" type="button" onClick={() => void deleteCharacter(character)}><Trash2 size={14} /> Excluir</button></div></article>; })}</div></section>}
 
         {view === "ctps" && <section className="admin-section"><div className="admin-section-heading"><div><Zap /><div><h2>Biblioteca de CTPs</h2><p>Somente os CTPs criados aqui aparecem ao cadastrar personagens.</p></div></div><button className="secondary-button" type="button" onClick={() => setPicker("ctp")}><ImagePlus size={15} /> Adicionar ou atualizar ícone</button></div><div className="management-grid ctp-management">{ctps.map((ctp) => <article className="management-card" key={ctp.id}>{ctp.image_url ? <img src={ctp.image_url} alt="" /> : <span>{ctp.name.slice(0, 2)}</span>}<div><strong>{ctp.name}</strong><small>{ctp.slug}</small></div><div className="management-actions"><button type="button" onClick={() => void renameCtp(ctp)}><Pencil size={14} /> Renomear</button><button className="danger" type="button" onClick={() => void deleteCtp(ctp)}><Trash2 size={14} /> Excluir</button></div></article>)}</div></section>}
 
@@ -308,6 +311,7 @@ export function DashboardPage({ user, profile }: DashboardPageProps) {
 
       {picker === "portrait" && <VisualAssetPicker title="Escolher retrato" items={portraits.map((portrait) => ({ id: portrait.id, label: portrait.file_name, imageUrl: portrait.public_url }))} selectedId={form.portrait_id} canUpload={isOwner} uploadLabel="Nome do personagem ou traje" onClose={() => setPicker(null)} onPasteImage={uploadPortrait} onSelect={(item) => setForm((current) => ({ ...current, portrait_id: item.id, image_url: item.imageUrl ?? "" }))} />}
       {picker === "ctp" && <VisualAssetPicker title="Biblioteca de CTPs" items={ctps.map((ctp) => ({ id: ctp.id, label: ctp.name, imageUrl: ctp.image_url }))} selectedId={form.ctp_id} canUpload={isOwner} uploadLabel="Nome do novo CTP" onClose={() => setPicker(null)} onPasteImage={uploadCtp} onSelect={(item) => setForm((current) => ({ ...current, ctp_id: item.id }))} />}
+      {picker === "ctp2" && <VisualAssetPicker title="Escolher CTP 2" items={ctps.map((ctp) => ({ id: ctp.id, label: ctp.name, imageUrl: ctp.image_url }))} selectedId={form.secondary_ctp_id} canUpload={isOwner} uploadLabel="Nome do novo CTP" onClose={() => setPicker(null)} onPasteImage={uploadCtp} onSelect={(item) => setForm((current) => ({ ...current, secondary_ctp_id: item.id }))} />}
     </main>
   );
 }

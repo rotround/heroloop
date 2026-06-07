@@ -39,6 +39,7 @@ export function CharacterCard({ character, onOpen }: CharacterCardProps) {
         </div>
         <div className="quick-stats">
           <span><strong>CTP</strong><span className="ctp-inline">{character.ctp_image_url && <img src={character.ctp_image_url} alt="" />}{character.best_ctp ?? "Em revisão"}</span></span>
+          {character.secondary_ctp_name && <span><strong>CTP 2</strong><span className="ctp-inline">{character.secondary_ctp_image_url && <img src={character.secondary_ctp_image_url} alt="" />}{character.secondary_ctp_name}</span></span>}
           <span><strong>Rotação</strong><code>{character.primary_rotation ?? "Em revisão"}</code></span>
         </div>
         <button className="card-button" type="button" onClick={() => onOpen(character)}>

@@ -73,8 +73,9 @@ export function CharacterModal({ character, onClose }: CharacterModalProps) {
             <span className="panel-label">Build recomendada</span>
             <div className="ctp-build">
               {character.ctp_image_url && <img src={character.ctp_image_url} alt={`CTP ${character.best_ctp ?? ""}`} />}
-              <h3>{character.best_ctp ?? "Em revisão"}</h3>
+              <div><span className="panel-label">CTP</span><h3>{character.best_ctp ?? "Em revisão"}</h3></div>
             </div>
+            {character.secondary_ctp_name && <div className="ctp-build">{character.secondary_ctp_image_url && <img src={character.secondary_ctp_image_url} alt={`CTP ${character.secondary_ctp_name}`} />}<div><span className="panel-label">CTP 2</span><h3>{character.secondary_ctp_name}</h3></div></div>}
             {character.alternative_ctps?.length ? <p>Alternativas: {character.alternative_ctps.join(", ")}</p> : null}
             <span className="panel-label">Uniforme</span>
             <p>{character.recommended_uniform ?? "Em revisão"}</p>

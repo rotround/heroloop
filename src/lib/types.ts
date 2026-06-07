@@ -20,6 +20,9 @@ export interface CharacterCatalog {
   alternative_ctps: string[] | null;
   ctp_id: string | null;
   ctp_image_url: string | null;
+  secondary_ctp_id: string | null;
+  secondary_ctp_name: string | null;
+  secondary_ctp_image_url: string | null;
 }
 
 export interface Profile {
@@ -66,6 +69,7 @@ export interface AdminCharacter {
     id: string;
     ctp_id: string | null;
     best_ctp: string;
+    secondary_ctp_id: string | null;
   }> | null;
 }
 
